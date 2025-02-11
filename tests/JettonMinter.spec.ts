@@ -129,8 +129,18 @@ describe('JettonMinter', () => {
             success: true,
         });
 
-        const data = await jettonMinter.getData();
-        expect(data.totalSupply).toBe(mintAmount);
+        const data1 = await jettonMinter.getData();
+        expect(data1.totalSupply).toBe(mintAmount);
+
+        // set new burn exchange rate
+        await jettonMinter.sendChangeExchangeRates(
+            deployer.getSender(),
+            defaultConfig.mintExchangeRate,
+            defaultConfig.mintExchangeRate,
+        );
+
+        const data2 = await jettonMinter.getExchangeRates();
+        expect(data2.burnExchangeRate).toBe(defaultConfig.mintExchangeRate);
 
         for (let i = 0; i < 100; i++) {
             const burnAmount = toNano('1');

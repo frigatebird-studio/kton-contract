@@ -227,7 +227,7 @@ slice get_wallet_address(slice owner_address) method_id {
     return (ctx_mint_exchange_rate, ctx_burn_exchange_rate);
 }
 
-(int, int) get_is_burnable() method_id {
+int get_is_burnable() method_id {
     load_data();
-    return (ctx_mintable, ctx_burnable);
+    return ctx_burnable;
 }
