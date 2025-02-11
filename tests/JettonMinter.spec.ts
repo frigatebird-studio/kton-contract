@@ -3,7 +3,15 @@ import { Address, beginCell, Cell, toNano } from '@ton/core';
 import { JettonMinter, JettonMinterConfig } from '../wrappers/JettonMinter';
 import '@ton/test-utils';
 import { compile } from '@ton/blueprint';
-import { JETTON_PROVIDE_WALLET_ADDRESS, JETTON_TAKE_WALLET_ADDRESS } from '../wrappers/opcodes';
+import {
+    JETTON_BURN_NOTIFICATION_OPCODE,
+    JETTON_BURN_OPCODE,
+    JETTON_BURN_REDEEM_OPCODE,
+    JETTON_EXCESSES_OPCODE,
+    JETTON_PROVIDE_WALLET_ADDRESS,
+    JETTON_TAKE_WALLET_ADDRESS,
+} from '../wrappers/opcodes';
+import { JettonWallet } from '../wrappers/JettonWallet';
 
 describe('JettonMinter', () => {
     let code: Cell;
@@ -31,7 +39,7 @@ describe('JettonMinter', () => {
             mintExchangeRate: 2000000000n,
             burnExchangeRate: 500000000n,
             mintable: true,
-            burnable: false,
+            burnable: true,
         };
 
         jettonMinter = blockchain.openContract(JettonMinter.createFromConfig(defaultConfig, code));
@@ -74,7 +82,130 @@ describe('JettonMinter', () => {
             success: true,
         });
 
+        expect(mintResult.transactions).toHaveTransaction({
+            to: deployer.address,
+            success: true,
+            op: JETTON_EXCESSES_OPCODE,
+        });
+
         const data = await jettonMinter.getData();
+        expect(data.totalSupply).toBe(mintAmount);
+    });
+
+    it('should mint tokens incorrectly (value not enough)', async () => {
+        const recipient = await blockchain.treasury('recipient');
+        const mintAmount = toNano('100');
+        const payAmount = (mintAmount * defaultConfig.mintExchangeRate) / 1000000000n;
+
+        const mintResult = await jettonMinter.sendMint(deployer.getSender(), recipient.address, mintAmount, {
+            value: payAmount, // missing fwd_fee + compute_fee
+            returnExcess: true,
+        });
+
+        expect(mintResult.transactions).toHaveTransaction({
+            from: deployer.address,
+            to: jettonMinter.address,
+            success: false,
+            exitCode: 77,
+        });
+
+        const data = await jettonMinter.getData();
+        expect(data.totalSupply).toBe(0n);
+    });
+
+    it('should burn tokens correctly', async () => {
+        const recipient = await blockchain.treasury('recipient');
+        let mintAmount = toNano('100');
+        const payAmount = (mintAmount * defaultConfig.mintExchangeRate) / 1000000000n;
+
+        const mintResult = await jettonMinter.sendMint(deployer.getSender(), recipient.address, mintAmount, {
+            value: payAmount + toNano('1'),
+            returnExcess: true,
+        });
+
+        expect(mintResult.transactions).toHaveTransaction({
+            from: deployer.address,
+            to: jettonMinter.address,
+            success: true,
+        });
+
+        const data = await jettonMinter.getData();
+        expect(data.totalSupply).toBe(mintAmount);
+
+        for (let i = 0; i < 100; i++) {
+            const burnAmount = toNano('1');
+            const jettonWallet = blockchain.openContract(
+                JettonWallet.createFromAddress(await jettonMinter.getWalletAddress(recipient.address)),
+            );
+            const burnResults = await jettonWallet.sendBurn(recipient.getSender(), burnAmount, {
+                value: toNano('0.025'),
+                returnExcess: true,
+            });
+
+            expect(burnResults.transactions).toHaveTransaction({
+                from: recipient.address,
+                to: jettonWallet.address,
+                success: true,
+                op: JETTON_BURN_OPCODE,
+            });
+            expect(burnResults.transactions).toHaveTransaction({
+                from: jettonWallet.address,
+                to: jettonMinter.address,
+                success: true,
+                op: JETTON_BURN_NOTIFICATION_OPCODE,
+            });
+
+            expect(burnResults.transactions).toHaveTransaction({
+                from: jettonMinter.address,
+                to: recipient.address,
+                success: true,
+                op: JETTON_BURN_REDEEM_OPCODE,
+                value: (x: bigint | undefined) =>
+                    (x ?? 0n) >= (burnAmount * defaultConfig.burnExchangeRate) / 1000000000n,
+            });
+
+            mintAmount -= burnAmount;
+            const data = await jettonMinter.getData();
+            expect(data.totalSupply).toBe(mintAmount);
+        }
+    });
+
+    it('should burn tokens incorrectly (value not enough)', async () => {
+        const recipient = await blockchain.treasury('recipient');
+        let mintAmount = toNano('100');
+        const payAmount = (mintAmount * defaultConfig.mintExchangeRate) / 1000000000n;
+
+        const mintResult = await jettonMinter.sendMint(deployer.getSender(), recipient.address, mintAmount, {
+            value: payAmount + toNano('1'),
+            returnExcess: true,
+        });
+
+        expect(mintResult.transactions).toHaveTransaction({
+            from: deployer.address,
+            to: jettonMinter.address,
+            success: true,
+        });
+
+        let data = await jettonMinter.getData();
+        expect(data.totalSupply).toBe(mintAmount);
+
+        const burnAmount = toNano('1');
+        const jettonWallet = blockchain.openContract(
+            JettonWallet.createFromAddress(await jettonMinter.getWalletAddress(recipient.address)),
+        );
+        const burnResults = await jettonWallet.sendBurn(recipient.getSender(), burnAmount, {
+            value: toNano('0.005'),
+            returnExcess: true,
+        });
+
+        expect(burnResults.transactions).toHaveTransaction({
+            from: recipient.address,
+            to: jettonWallet.address,
+            success: false,
+            op: JETTON_BURN_OPCODE,
+        });
+
+        data = await jettonMinter.getData();
         expect(data.totalSupply).toBe(mintAmount);
     });
 

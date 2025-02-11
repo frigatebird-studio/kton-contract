@@ -98,7 +98,7 @@ global int ctx_burnable;
         master_msg_cs~skip_bits(32 + 64); ;; op + query_id
         int jetton_amount = master_msg_cs~load_coins();
 
-        int received_ton_expected = muldiv(jetton_amount, KTON_DECIMALS, ctx_mint_exchange_rate);
+        int received_ton_expected = muldiv(jetton_amount, ctx_mint_exchange_rate, TON_DECIMALS);
         throw_unless(77, msg_value > fwd_fee + received_ton_expected);
 
         raw_reserve(balance - msg_value + received_ton_expected, RESERVE_REGULAR);
@@ -118,7 +118,7 @@ global int ctx_burnable;
             equal_slices_bits(calculate_user_jetton_wallet_address(from_address, my_address(), ctx_jetton_wallet_code), sender_address)
         );
 
-        int send_ton_expected = muldiv(jetton_amount, TON_DECIMALS, ctx_burn_exchange_rate);
+        int send_ton_expected = muldiv(jetton_amount, ctx_burn_exchange_rate, KTON_DECIMALS);
 
         raw_reserve(balance - msg_value - send_ton_expected, RESERVE_REGULAR);
 
@@ -130,9 +130,9 @@ global int ctx_burnable;
             var msg = begin_cell()
                     .store_uint(0x10, 6) ;; nobounce - int_msg_info$0 ihr_disabled:Bool bounce:Bool bounced:Bool src:MsgAddress -> 011000
                     .store_slice(response_address)
-                    .store_coins(0)
+                    .store_coins(send_ton_expected)
                     .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
-                    .store_uint(op::excesses(), 32)
+                    .store_uint(op::burn_redeem(), 32)
                     .store_uint(query_id, 64);
             send_raw_message(msg.end_cell(), 2 + 64);
         }
