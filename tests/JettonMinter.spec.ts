@@ -1,37 +1,40 @@
-import { Blockchain, SandboxContract, TreasuryContract } from '@ton/sandbox';
+import { Blockchain, SandboxContract, TreasuryContract, BlockchainSnapshot } from '@ton/sandbox';
 import { Address, beginCell, Cell, toNano } from '@ton/core';
-import { JettonMinter } from '../wrappers/JettonMinter';
+import { JettonMinter, JettonMinterConfig } from '../wrappers/JettonMinter';
 import '@ton/test-utils';
 import { compile } from '@ton/blueprint';
+import { JETTON_PROVIDE_WALLET_ADDRESS, JETTON_TAKE_WALLET_ADDRESS } from '../wrappers/opcodes';
 
 describe('JettonMinter', () => {
     let code: Cell;
-
-    beforeAll(async () => {
-        code = await compile('JettonMinter');
-    });
+    let walletCode: Cell;
+    let defaultContent: Cell;
+    let defaultConfig: JettonMinterConfig;
 
     let blockchain: Blockchain;
+    let blockchainState: BlockchainSnapshot;
     let deployer: SandboxContract<TreasuryContract>;
     let jettonMinter: SandboxContract<JettonMinter>;
 
-    const defaultContent = beginCell().storeUint(0, 8).endCell();
-    const walletCode = beginCell().storeUint(0, 8).endCell();
-
-    beforeEach(async () => {
+    beforeAll(async () => {
+        code = await compile('JettonMinter');
+        walletCode = await compile('JettonWallet');
+        defaultContent = beginCell().storeUint(1, 8).storeStringTail('').endCell();
         blockchain = await Blockchain.create();
         deployer = await blockchain.treasury('deployer');
 
-        jettonMinter = blockchain.openContract(
-            JettonMinter.createFromConfig(
-                {
-                    admin: deployer.address,
-                    content: defaultContent,
-                    jettonWalletCode: walletCode,
-                },
-                code,
-            ),
-        );
+        defaultConfig = {
+            totalSupply: 0n,
+            admin: deployer.address,
+            content: defaultContent,
+            jettonWalletCode: walletCode,
+            mintExchangeRate: 2000000000n,
+            burnExchangeRate: 500000000n,
+            mintable: true,
+            burnable: false,
+        };
+
+        jettonMinter = blockchain.openContract(JettonMinter.createFromConfig(defaultConfig, code));
 
         const deployResult = await jettonMinter.sendDeploy(deployer.getSender(), toNano('0.05'));
         expect(deployResult.transactions).toHaveTransaction({
@@ -40,6 +43,12 @@ describe('JettonMinter', () => {
             deploy: true,
             success: true,
         });
+
+        blockchainState = blockchain.snapshot();
+    });
+
+    beforeEach(async () => {
+        blockchain.loadFrom(blockchainState);
     });
 
     it('should deploy and initialize with correct data', async () => {
@@ -52,9 +61,11 @@ describe('JettonMinter', () => {
     it('should mint tokens correctly', async () => {
         const recipient = await blockchain.treasury('recipient');
         const mintAmount = toNano('100');
+        const payAmount = (mintAmount * defaultConfig.mintExchangeRate) / 1000000000n;
 
         const mintResult = await jettonMinter.sendMint(deployer.getSender(), recipient.address, mintAmount, {
-            value: toNano('0.1'),
+            value: payAmount + toNano('1'),
+            returnExcess: true,
         });
 
         expect(mintResult.transactions).toHaveTransaction({
@@ -85,7 +96,7 @@ describe('JettonMinter', () => {
     });
 
     it('should change content correctly', async () => {
-        const newContent = beginCell().storeUint(1, 8).endCell();
+        const newContent = beginCell().storeUint(1, 8).storeStringTail('new content').endCell();
 
         const changeContentResult = await jettonMinter.sendChangeContent(deployer.getSender(), newContent, {
             value: toNano('0.05'),
@@ -96,6 +107,9 @@ describe('JettonMinter', () => {
             to: jettonMinter.address,
             success: true,
         });
+
+        const data = await jettonMinter.getData();
+        expect(data.jettonContent.toBoc().toString('hex')).toBe(newContent.toBoc().toString('hex'));
     });
 
     it('should get wallet address correctly', async () => {
@@ -104,5 +118,27 @@ describe('JettonMinter', () => {
 
         expect(walletAddress).toBeDefined();
         expect(walletAddress).toBeInstanceOf(Address);
+    });
+
+    it('should get wallet address onchain correctly', async () => {
+        const owner = await blockchain.treasury('owner');
+        const provideWalletAddressResult = await jettonMinter.sendProvideWalletAddress(
+            deployer.getSender(),
+            owner.address,
+        );
+
+        expect(provideWalletAddressResult.transactions).toHaveTransaction({
+            from: deployer.address,
+            to: jettonMinter.address,
+            success: true,
+            op: JETTON_PROVIDE_WALLET_ADDRESS,
+        });
+
+        expect(provideWalletAddressResult.transactions).toHaveTransaction({
+            from: jettonMinter.address,
+            to: deployer.address,
+            success: true,
+            op: JETTON_TAKE_WALLET_ADDRESS,
+        });
     });
 });

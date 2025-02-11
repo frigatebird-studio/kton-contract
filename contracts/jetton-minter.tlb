@@ -21,4 +21,6 @@ provide_wallet_address query_id:uint64 owner_address:MsgAddress include_owner_ad
 
 update_exchange_rate#5 query_id:uint64 mint_exchange_rate:uint64 burn_exchange_rate:uint64 = InternalMsgBody
 
-update_start_mint_burn#6 query_id:uint64 start_mint:Bool start_burn:Bool = InternalMsgBody
+update_mintable_burnable#6 query_id:uint64 start_mint:Bool start_burn:Bool = InternalMsgBody
+
+withdraw#7 query_id:uint64 = InternalMsgBody

@@ -20,6 +20,7 @@ import { storeJettonChangeAdminMessage } from './types/JettonChangeAdminMessage'
 import { storeJettonChangeContentMessage } from './types/JettonChangeContentMessage';
 import { JettonMinterAction, parseJettonMinterTransaction } from './types/JettonMinterAction';
 import { JettonMinterData } from './types/JettonMinterData';
+import { JETTON_PROVIDE_WALLET_ADDRESS } from './opcodes';
 
 export type JettonMinterConfig = JettonMinterContent;
 
@@ -83,7 +84,7 @@ export class JettonMinter implements Contract {
                         forwardPayload: notification?.payload ?? null,
                         forwardTonAmount: notification?.amount ?? 0n,
                         walletForwardValue:
-                            (notification?.amount ?? 0n) + (excessReturn ? toNano('0.01') : 0n) + toNano(0.02),
+                            (notification?.amount ?? 0n) + (excessReturn ? toNano('0.01') : 0n) + toNano('0.02'),
                     }),
                 )
                 .endCell(),
@@ -141,7 +142,7 @@ export class JettonMinter implements Contract {
         const { stack } = await provider.get('get_jetton_data', builder.build());
         return {
             totalSupply: stack.readBigNumber(),
-            mintable: stack.readBigNumber() !== 0n,
+            mintable: stack.readBoolean(),
             adminAddress: stack.readAddressOpt(),
             jettonContent: stack.readCell(),
             jettonWalletCode: stack.readCell(),
@@ -151,8 +152,30 @@ export class JettonMinter implements Contract {
     async getWalletAddress(provider: ContractProvider, owner: Address) {
         const builder = new TupleBuilder();
         builder.writeAddress(owner);
+        const t = builder.build();
         const { stack } = await provider.get('get_wallet_address', builder.build());
         return stack.readAddress();
+    }
+
+    async sendProvideWalletAddress(
+        provider: ContractProvider,
+        sender: Sender,
+        owner: Address,
+        options?: {
+            value?: bigint;
+            queryId?: bigint;
+        },
+    ) {
+        await provider.internal(sender, {
+            value: options?.value ?? toNano('0.05'),
+            bounce: true,
+            body: beginCell()
+                .storeUint(JETTON_PROVIDE_WALLET_ADDRESS, 32)
+                .storeUint(options?.queryId ?? 0, 64)
+                .storeAddress(owner)
+                .storeBit(true)
+                .endCell(),
+        });
     }
 
     async getWallet(provider: ContractProvider, owner: Address) {
