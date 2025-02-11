@@ -18,8 +18,8 @@ global ctx_content;
 global ctx_jetton_wallet_code;
 global ctx_mint_exchange_rate;
 global ctx_burn_exchange_rate;
-global ctx_start_mint;
-global ctx_start_burn;
+global mintable;
+global burnable;
 
 () load_data() inline {
     slice ds = get_data().begin_parse();
@@ -31,9 +31,8 @@ global ctx_start_burn;
 
     ctx_mint_exchange_rate = ds~load_uint(64); ;; mint_exchange_rate
     ctx_burn_exchange_rate = ds~load_uint(64); ;; burn_exchange_rate
-    ctx_start_mint = ds~load_uint(1); ;; start_mint
-    ctx_start_burn = ds~load_uint(1); ;; start_burn
-    
+    mintable = ds~load_uint(1); ;; mintable
+    burnable = ds~load_uint(1); ;; burnable
 }
 
 () save_data() impure inline {
@@ -44,8 +43,8 @@ global ctx_start_burn;
             .store_ref(ctx_jetton_wallet_code)
             .store_uint(ctx_mint_exchange_rate, 64)
             .store_uint(ctx_burn_exchange_rate, 64)
-            .store_uint(ctx_start_mint, 1)
-            .store_uint(ctx_start_burn, 1)
+            .store_uint(mintable, 1)
+            .store_uint(burnable, 1)
             .end_cell()
     );
 }
@@ -88,7 +87,7 @@ global ctx_start_burn;
     load_data();
 
     if (op == op::mint()) {
-        throw_unless(78, ctx_start_mint);
+        throw_unless(78, mintable);
 
         throw_unless(73, equal_slices_bits(sender_address, ctx_admin_address));
         slice to_address = in_msg_body~load_msg_addr();
@@ -110,7 +109,7 @@ global ctx_start_burn;
     }
 
     if (op == op::burn_notification()) {
-        throw_unless(79, ctx_start_burn);
+        throw_unless(79, burnable);
 
         int jetton_amount = in_msg_body~load_coins();
         slice from_address = in_msg_body~load_msg_addr();
@@ -191,8 +190,8 @@ global ctx_start_burn;
 
     if (op == 6) { ;; update start mint/burn
         throw_unless(73, equal_slices_bits(sender_address, ctx_admin_address));
-        ctx_start_mint = in_msg_body~load_uint(1);
-        ctx_start_burn = in_msg_body~load_uint(1);
+        mintable = in_msg_body~load_uint(1);
+        burnable = in_msg_body~load_uint(1);
         save_data();
         return ();
     }
@@ -202,7 +201,7 @@ global ctx_start_burn;
 
 (int, int, slice, cell, cell) get_jetton_data() method_id {
     load_data();
-    return (ctx_total_supply, -1, ctx_admin_address, ctx_content, ctx_jetton_wallet_code);
+    return (ctx_total_supply, mintable, ctx_admin_address, ctx_content, ctx_jetton_wallet_code);
 }
 
 slice get_wallet_address(slice owner_address) method_id {
@@ -215,7 +214,7 @@ slice get_wallet_address(slice owner_address) method_id {
     return (ctx_mint_exchange_rate, ctx_burn_exchange_rate);
 }
 
-(int, int) get_mint_burn_status() method_id {
+(int, int) get_is_burnable() method_id {
     load_data();
-    return (ctx_start_mint, ctx_start_burn);
+    return (mintable, burnable);
 }

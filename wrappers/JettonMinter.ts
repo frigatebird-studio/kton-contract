@@ -24,15 +24,7 @@ import { JettonMinterData } from './types/JettonMinterData';
 export type JettonMinterConfig = JettonMinterContent;
 
 export function jettonMinterConfigToCell(config: JettonMinterConfig): Cell {
-    return beginCell()
-        .store(
-            storeJettonMinterContent({
-                admin: config.admin,
-                content: config.content,
-                jettonWalletCode: config.jettonWalletCode,
-            }),
-        )
-        .endCell();
+    return beginCell().store(storeJettonMinterContent(config)).endCell();
 }
 
 export class JettonMinter implements Contract {

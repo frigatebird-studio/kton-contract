@@ -7,3 +7,8 @@ export interface JettonMinterData {
     jettonContent: Cell;
     jettonWalletCode: Cell;
 }
+
+export interface JettonMinterExchangeRates {
+    mintExchangeRate: bigint;
+    burnExchangeRate: bigint;
+}
