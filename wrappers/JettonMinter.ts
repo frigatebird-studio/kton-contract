@@ -33,7 +33,7 @@ export class JettonMinter implements Contract {
         public readonly address: Address,
         public readonly init?: StateInit,
         public readonly contentResolver?: ContentResolver,
-    ) {}
+    ) { }
 
     static createFromAddress(address: Address, contentResolver?: ContentResolver): JettonMinter {
         return new JettonMinter(address, undefined, contentResolver);
@@ -62,8 +62,8 @@ export class JettonMinter implements Contract {
         sender: Sender,
         recipient: Address,
         amount: bigint,
-        options?: SendTransferOptions & {
-            value?: bigint;
+        options: SendTransferOptions & {
+            value: bigint;
             queryId?: bigint;
         },
     ) {
@@ -71,12 +71,12 @@ export class JettonMinter implements Contract {
         const excessReturn = parseExcessReturnOptions(options?.returnExcess, sender);
 
         await provider.internal(sender, {
-            value: options?.value ?? toNano('0.05'),
+            value: options.value,
             bounce: true,
             body: beginCell()
                 .store(
                     storeJettonMintMessage({
-                        queryId: options?.queryId ?? 0n,
+                        queryId: options.queryId ?? 0n,
                         amount: amount,
                         from: this.address,
                         to: recipient,
@@ -272,10 +272,10 @@ export class JettonMinter implements Contract {
         options?:
             | { lt?: never; hash?: never; limit?: number }
             | {
-                  lt: bigint;
-                  hash: Buffer;
-                  limit?: number;
-              },
+                lt: bigint;
+                hash: Buffer;
+                limit?: number;
+            },
     ): Promise<JettonMinterAction[]> {
         let { lt, hash, limit } = options ?? {};
         if (!lt || !hash) {
