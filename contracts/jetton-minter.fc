@@ -90,7 +90,6 @@ global int ctx_burnable;
     if (op == op::mint()) {
         throw_unless(78, ctx_mintable);
 
-        throw_unless(73, equal_slices_bits(sender_address, ctx_admin_address));
         slice to_address = in_msg_body~load_msg_addr();
         int amount = in_msg_body~load_coins();
         cell master_msg = in_msg_body~load_ref();
