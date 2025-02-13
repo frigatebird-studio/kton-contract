@@ -19,20 +19,13 @@ import { JettonMinterContent, storeJettonMinterContent } from './types/JettonMin
 import { storeJettonChangeAdminMessage } from './types/JettonChangeAdminMessage';
 import { storeJettonChangeContentMessage } from './types/JettonChangeContentMessage';
 import { JettonMinterAction, parseJettonMinterTransaction } from './types/JettonMinterAction';
-import { JettonMinterData } from './types/JettonMinterData';
+import { JettonMinterData, JettonMinterExchangeRates } from './types/JettonMinterData';
+import { JETTON_PROVIDE_WALLET_ADDRESS } from './opcodes';
 
 export type JettonMinterConfig = JettonMinterContent;
 
 export function jettonMinterConfigToCell(config: JettonMinterConfig): Cell {
-    return beginCell()
-        .store(
-            storeJettonMinterContent({
-                admin: config.admin,
-                content: config.content,
-                jettonWalletCode: config.jettonWalletCode,
-            }),
-        )
-        .endCell();
+    return beginCell().store(storeJettonMinterContent(config)).endCell();
 }
 
 export class JettonMinter implements Contract {
@@ -40,7 +33,7 @@ export class JettonMinter implements Contract {
         public readonly address: Address,
         public readonly init?: StateInit,
         public readonly contentResolver?: ContentResolver,
-    ) {}
+    ) { }
 
     static createFromAddress(address: Address, contentResolver?: ContentResolver): JettonMinter {
         return new JettonMinter(address, undefined, contentResolver);
@@ -69,8 +62,8 @@ export class JettonMinter implements Contract {
         sender: Sender,
         recipient: Address,
         amount: bigint,
-        options?: SendTransferOptions & {
-            value?: bigint;
+        options: SendTransferOptions & {
+            value: bigint;
             queryId?: bigint;
         },
     ) {
@@ -78,12 +71,12 @@ export class JettonMinter implements Contract {
         const excessReturn = parseExcessReturnOptions(options?.returnExcess, sender);
 
         await provider.internal(sender, {
-            value: options?.value ?? toNano('0.05'),
+            value: options.value,
             bounce: true,
             body: beginCell()
                 .store(
                     storeJettonMintMessage({
-                        queryId: options?.queryId ?? 0n,
+                        queryId: options.queryId ?? 0n,
                         amount: amount,
                         from: this.address,
                         to: recipient,
@@ -91,7 +84,7 @@ export class JettonMinter implements Contract {
                         forwardPayload: notification?.payload ?? null,
                         forwardTonAmount: notification?.amount ?? 0n,
                         walletForwardValue:
-                            (notification?.amount ?? 0n) + (excessReturn ? toNano('0.01') : 0n) + toNano(0.02),
+                            (notification?.amount ?? 0n) + (excessReturn ? toNano('0.01') : 0n) + toNano('0.02'),
                     }),
                 )
                 .endCell(),
@@ -144,15 +137,86 @@ export class JettonMinter implements Contract {
         });
     }
 
+    async sendChangeExchangeRates(
+        provider: ContractProvider,
+        sender: Sender,
+        newMintExchangeRate: bigint,
+        newBurnExchangeRate: bigint,
+        options?: {
+            value?: bigint;
+            queryId?: bigint;
+        },
+    ) {
+        await provider.internal(sender, {
+            value: options?.value ?? toNano('0.05'),
+            bounce: true,
+            body: beginCell()
+                .storeUint(5, 32)
+                .storeUint(options?.queryId ?? 0, 64)
+                .storeUint(newMintExchangeRate, 64)
+                .storeUint(newBurnExchangeRate, 64)
+                .endCell(),
+        });
+    }
+
+    async sendChangeMintableBurnable(
+        provider: ContractProvider,
+        sender: Sender,
+        isMintable: boolean,
+        isBurnable: boolean,
+        options?: {
+            value?: bigint;
+            queryId?: bigint;
+        },
+    ) {
+        await provider.internal(sender, {
+            value: options?.value ?? toNano('0.05'),
+            bounce: true,
+            body: beginCell()
+                .storeUint(6, 32)
+                .storeUint(options?.queryId ?? 0, 64)
+                .storeBit(isMintable)
+                .storeBit(isBurnable)
+                .endCell(),
+        });
+    }
+
+    async sendWithdrawAll(
+        provider: ContractProvider,
+        sender: Sender,
+        options?: {
+            value?: bigint;
+            queryId?: bigint;
+        },
+    ) {
+        await provider.internal(sender, {
+            value: options?.value ?? toNano('0.05'),
+            bounce: true,
+            body: beginCell()
+                .storeUint(7, 32)
+                .storeUint(options?.queryId ?? 0, 64)
+                .endCell(),
+        });
+    }
+
     async getData(provider: ContractProvider): Promise<JettonMinterData> {
         const builder = new TupleBuilder();
         const { stack } = await provider.get('get_jetton_data', builder.build());
         return {
             totalSupply: stack.readBigNumber(),
-            mintable: stack.readBigNumber() !== 0n,
+            mintable: stack.readBoolean(),
             adminAddress: stack.readAddressOpt(),
             jettonContent: stack.readCell(),
             jettonWalletCode: stack.readCell(),
+        };
+    }
+
+    async getExchangeRates(provider: ContractProvider): Promise<JettonMinterExchangeRates> {
+        const builder = new TupleBuilder();
+        const { stack } = await provider.get('get_exchange_rates', builder.build());
+        return {
+            mintExchangeRate: stack.readBigNumber(),
+            burnExchangeRate: stack.readBigNumber(),
         };
     }
 
@@ -161,6 +225,32 @@ export class JettonMinter implements Contract {
         builder.writeAddress(owner);
         const { stack } = await provider.get('get_wallet_address', builder.build());
         return stack.readAddress();
+    }
+
+    async getIsBurnable(provider: ContractProvider) {
+        const { stack } = await provider.get('get_is_burnable', []);
+        return stack.readBoolean();
+    }
+
+    async sendProvideWalletAddress(
+        provider: ContractProvider,
+        sender: Sender,
+        owner: Address,
+        options?: {
+            value?: bigint;
+            queryId?: bigint;
+        },
+    ) {
+        await provider.internal(sender, {
+            value: options?.value ?? toNano('0.05'),
+            bounce: true,
+            body: beginCell()
+                .storeUint(JETTON_PROVIDE_WALLET_ADDRESS, 32)
+                .storeUint(options?.queryId ?? 0, 64)
+                .storeAddress(owner)
+                .storeBit(true)
+                .endCell(),
+        });
     }
 
     async getWallet(provider: ContractProvider, owner: Address) {
@@ -182,10 +272,10 @@ export class JettonMinter implements Contract {
         options?:
             | { lt?: never; hash?: never; limit?: number }
             | {
-                  lt: bigint;
-                  hash: Buffer;
-                  limit?: number;
-              },
+                lt: bigint;
+                hash: Buffer;
+                limit?: number;
+            },
     ): Promise<JettonMinterAction[]> {
         let { lt, hash, limit } = options ?? {};
         if (!lt || !hash) {

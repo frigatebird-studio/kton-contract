@@ -32,7 +32,7 @@ export class JettonWallet implements Contract {
     constructor(
         public readonly address: Address,
         public readonly init?: StateInit,
-    ) {}
+    ) { }
 
     static createFromConfig(config: JettonWalletConfig, code: Cell, workchain?: number) {
         const data = jettonWalletConfigToCell({
@@ -103,7 +103,7 @@ export class JettonWallet implements Contract {
         const excessReturn = parseExcessReturnOptions(options?.returnExcess, sender);
 
         await provider.internal(sender, {
-            value: options?.value ?? toNano('0.05'),
+            value: options?.value ?? toNano('0.1'),
             bounce: true,
             sendMode: SendMode.PAY_GAS_SEPARATELY,
             body: beginCell()
@@ -134,10 +134,10 @@ export class JettonWallet implements Contract {
         options?:
             | { lt?: never; hash?: never; limit?: number }
             | {
-                  lt: bigint;
-                  hash: Buffer;
-                  limit?: number;
-              },
+                lt: bigint;
+                hash: Buffer;
+                limit?: number;
+            },
     ): Promise<JettonWalletAction[]> {
         let { lt, hash, limit } = options ?? {};
         if (!lt || !hash) {
