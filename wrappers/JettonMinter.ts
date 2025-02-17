@@ -42,8 +42,8 @@ export function prepareMint(
     minterAddress: Address,
     recipient: Address,
     amount: bigint,
-    options: SendTransferOptions & {
-        value: bigint;
+    options?: SendTransferOptions & {
+        value?: bigint;
         queryId?: bigint;
     },
     expectedFee: bigint = toNano('0.1'),
@@ -55,7 +55,7 @@ export function prepareMint(
     const boc = beginCell()
         .store(
             storeJettonMintMessage({
-                queryId: options.queryId ?? 0n,
+                queryId: options?.queryId ?? 0n,
                 amount: amount,
                 from: minterAddress,
                 to: recipient,

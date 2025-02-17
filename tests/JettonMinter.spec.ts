@@ -1,6 +1,6 @@
 import { Blockchain, SandboxContract, TreasuryContract, BlockchainSnapshot } from '@ton/sandbox';
-import { Address, beginCell, Cell, toNano } from '@ton/core';
-import { JettonMinter, JettonMinterConfig } from '../wrappers/JettonMinter';
+import { Address, beginCell, Cell, internal, toNano } from '@ton/core';
+import { JettonMinter, JettonMinterConfig, prepareMint } from '../wrappers/JettonMinter';
 import '@ton/test-utils';
 import { compile } from '@ton/blueprint';
 import {
@@ -101,6 +101,50 @@ describe('JettonMinter', () => {
             value: payAmount + toNano('0.1'),
             returnExcess: true,
         });
+
+        expect(mintResult.transactions).toHaveTransaction({
+            from: recipient.address,
+            to: jettonMinter.address,
+            success: true,
+        });
+
+        expect(mintResult.transactions).toHaveTransaction({
+            to: recipient.address,
+            success: true,
+            op: JETTON_EXCESSES_OPCODE,
+        });
+
+        const data = await jettonMinter.getData();
+        expect(data.totalSupply).toBe(mintAmount);
+    });
+
+    it('should mint tokens correctly by random wallet (via raw send)', async () => {
+        const recipient = await blockchain.treasury('random');
+        const mintAmount = toNano('100');
+        const fee = toNano('0.06');
+        const payAmount = (mintAmount * defaultConfig.mintExchangeRate) / 1000000000n;
+
+        const preparation = prepareMint(
+            recipient.getSender(),
+            jettonMinter.address,
+            recipient.address,
+            mintAmount,
+            {
+                returnExcess: true,
+            },
+            fee,
+            defaultConfig.mintExchangeRate,
+        );
+
+        expect(preparation.value).toBe(payAmount + fee);
+
+        const mintResult = await recipient.sendMessages([
+            internal({
+                to: preparation.sentToAddress,
+                value: preparation.value!,
+                body: preparation.payload,
+            }),
+        ]);
 
         expect(mintResult.transactions).toHaveTransaction({
             from: recipient.address,
