@@ -210,7 +210,7 @@ describe('JettonMinter', () => {
         const payAmount = (mintAmount * defaultConfig.mintExchangeRate) / 1000000000n;
 
         const mintResult = await jettonMinter.sendMint(deployer.getSender(), recipient.address, mintAmount, {
-            value: payAmount + toNano('1'),
+            value: payAmount + toNano('0.05'),
             returnExcess: true,
         });
 
