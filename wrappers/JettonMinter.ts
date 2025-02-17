@@ -28,6 +28,56 @@ export function jettonMinterConfigToCell(config: JettonMinterConfig): Cell {
     return beginCell().store(storeJettonMinterContent(config)).endCell();
 }
 
+export interface IPrepare {
+    sentToAddress: Address;
+    payload: Cell;
+    value?: bigint;
+    stateInit?: StateInit;
+}
+
+const TON_DECIMALS = 1000000000n;
+
+export function prepareMint(
+    sender: Sender,
+    minterAddress: Address,
+    recipient: Address,
+    amount: bigint,
+    options: SendTransferOptions & {
+        value: bigint;
+        queryId?: bigint;
+    },
+    expectedFee: bigint = toNano('0.1'),
+    mintExchangeRate?: bigint,
+): IPrepare {
+    const notification = parseNotifyOptions(options?.notify);
+    const excessReturn = parseExcessReturnOptions(options?.returnExcess, sender);
+
+    const boc = beginCell()
+        .store(
+            storeJettonMintMessage({
+                queryId: options.queryId ?? 0n,
+                amount: amount,
+                from: minterAddress,
+                to: recipient,
+                responseAddress: excessReturn?.address ?? null,
+                forwardPayload: notification?.payload ?? null,
+                forwardTonAmount: notification?.amount ?? 0n,
+                walletForwardValue:
+                    (notification?.amount ?? 0n) + (excessReturn ? toNano('0.01') : 0n) + toNano('0.02'),
+            }),
+        )
+        .endCell();
+    const returns: IPrepare = {
+        sentToAddress: minterAddress,
+        payload: boc,
+    };
+    if (mintExchangeRate) {
+        returns.value = (amount * mintExchangeRate) / TON_DECIMALS + expectedFee;
+    }
+
+    return returns;
+}
+
 export class JettonMinter implements Contract {
     constructor(
         public readonly address: Address,
@@ -67,32 +117,13 @@ export class JettonMinter implements Contract {
             queryId?: bigint;
         },
     ) {
-        const notification = parseNotifyOptions(options?.notify);
-        const excessReturn = parseExcessReturnOptions(options?.returnExcess, sender);
-
-        const boc = beginCell()
-            .store(
-                storeJettonMintMessage({
-                    queryId: options.queryId ?? 0n,
-                    amount: amount,
-                    from: this.address,
-                    to: recipient,
-                    responseAddress: excessReturn?.address ?? null,
-                    forwardPayload: notification?.payload ?? null,
-                    forwardTonAmount: notification?.amount ?? 0n,
-                    walletForwardValue:
-                        (notification?.amount ?? 0n) + (excessReturn ? toNano('0.01') : 0n) + toNano('0.02'),
-                }),
-            )
-            .endCell();
+        const preparation = prepareMint(sender, this.address, recipient, amount, options);
 
         await provider.internal(sender, {
             value: options.value,
             bounce: true,
-            body: boc,
+            body: preparation.payload,
         });
-
-        return boc.toBoc().toString('hex');
     }
 
     async sendChangeAdmin(
