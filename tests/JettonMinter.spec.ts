@@ -121,7 +121,7 @@ describe('JettonMinter', () => {
     it('should mint tokens correctly by random wallet (via raw send)', async () => {
         const recipient = await blockchain.treasury('random');
         const mintAmount = toNano('100');
-        const fee = toNano('0.06');
+        const fee = toNano('0.05');
         const payAmount = (mintAmount * defaultConfig.mintExchangeRate) / 1000000000n;
 
         const preparation = prepareMint(
