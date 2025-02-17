@@ -33,7 +33,7 @@ export class JettonMinter implements Contract {
         public readonly address: Address,
         public readonly init?: StateInit,
         public readonly contentResolver?: ContentResolver,
-    ) { }
+    ) {}
 
     static createFromAddress(address: Address, contentResolver?: ContentResolver): JettonMinter {
         return new JettonMinter(address, undefined, contentResolver);
@@ -232,6 +232,11 @@ export class JettonMinter implements Contract {
         return stack.readBoolean();
     }
 
+    async getBalance(provider: ContractProvider) {
+        const state = await provider.getState();
+        return state.balance;
+    }
+
     async sendProvideWalletAddress(
         provider: ContractProvider,
         sender: Sender,
@@ -272,10 +277,10 @@ export class JettonMinter implements Contract {
         options?:
             | { lt?: never; hash?: never; limit?: number }
             | {
-                lt: bigint;
-                hash: Buffer;
-                limit?: number;
-            },
+                  lt: bigint;
+                  hash: Buffer;
+                  limit?: number;
+              },
     ): Promise<JettonMinterAction[]> {
         let { lt, hash, limit } = options ?? {};
         if (!lt || !hash) {

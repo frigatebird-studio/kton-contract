@@ -197,7 +197,7 @@ global int ctx_burnable;
         return ();
     }
 
-    if(op == 7) { ;; withdraw
+    if (op == 7) { ;; withdraw
         throw_unless(73, equal_slices_bits(sender_address, ctx_admin_address));
         var msg = begin_cell()
             .store_uint(0x18, 6)
@@ -205,6 +205,7 @@ global int ctx_burnable;
             .store_coins(0)
             .store_uint(0, 107);
         send_raw_message(msg.end_cell(), SEND_MODE_IGNORE_ERRORS + SEND_MODE_CARRY_ALL_BALANCE); ;; ignore errors
+        return ();
     }
 
     throw(0xffff);

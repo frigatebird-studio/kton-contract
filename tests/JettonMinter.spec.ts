@@ -274,9 +274,14 @@ describe('JettonMinter', () => {
     });
 
     it('should change exchange rates correctly (including mint/burn sanity check)', async () => {
-        const changeExchangeRatesResult = await jettonMinter.sendChangeExchangeRates(deployer.getSender(), 3333333333n, 333333333n, {
-            value: toNano('0.05'),
-        });
+        const changeExchangeRatesResult = await jettonMinter.sendChangeExchangeRates(
+            deployer.getSender(),
+            3333333333n,
+            333333333n,
+            {
+                value: toNano('0.05'),
+            },
+        );
 
         expect(changeExchangeRatesResult.transactions).toHaveTransaction({
             from: deployer.address,
@@ -342,8 +347,7 @@ describe('JettonMinter', () => {
             to: recipient.address,
             success: true,
             op: JETTON_BURN_REDEEM_OPCODE,
-            value: (x: bigint | undefined) =>
-                (x ?? 0n) >= (burnAmount * burnExchangeRate) / 1000000000n,
+            value: (x: bigint | undefined) => (x ?? 0n) >= (burnAmount * burnExchangeRate) / 1000000000n,
         });
 
         const data2 = await jettonMinter.getData();
@@ -395,5 +399,30 @@ describe('JettonMinter', () => {
             success: true,
             op: JETTON_TAKE_WALLET_ADDRESS,
         });
+    });
+
+    it('should withdraw all correctly', async () => {
+        const deployerOldBalance = await deployer.getBalance();
+        const contractOldBalance = await jettonMinter.getBalance();
+
+        const withdrawResult = await jettonMinter.sendWithdrawAll(deployer.getSender());
+
+        expect(withdrawResult.transactions).toHaveTransaction({
+            from: deployer.address,
+            to: jettonMinter.address,
+            success: true,
+        });
+
+        expect(withdrawResult.transactions).toHaveTransaction({
+            from: jettonMinter.address,
+            to: deployer.address,
+            success: true,
+        });
+
+        const deployerNewBalance = await deployer.getBalance();
+        const contractNewBalance = await jettonMinter.getBalance();
+
+        expect(deployerNewBalance).toBeGreaterThan(deployerOldBalance);
+        expect(contractNewBalance).toBe(0n);
     });
 });
