@@ -70,25 +70,29 @@ export class JettonMinter implements Contract {
         const notification = parseNotifyOptions(options?.notify);
         const excessReturn = parseExcessReturnOptions(options?.returnExcess, sender);
 
+        const boc = beginCell()
+            .store(
+                storeJettonMintMessage({
+                    queryId: options.queryId ?? 0n,
+                    amount: amount,
+                    from: this.address,
+                    to: recipient,
+                    responseAddress: excessReturn?.address ?? null,
+                    forwardPayload: notification?.payload ?? null,
+                    forwardTonAmount: notification?.amount ?? 0n,
+                    walletForwardValue:
+                        (notification?.amount ?? 0n) + (excessReturn ? toNano('0.01') : 0n) + toNano('0.02'),
+                }),
+            )
+            .endCell();
+
         await provider.internal(sender, {
             value: options.value,
             bounce: true,
-            body: beginCell()
-                .store(
-                    storeJettonMintMessage({
-                        queryId: options.queryId ?? 0n,
-                        amount: amount,
-                        from: this.address,
-                        to: recipient,
-                        responseAddress: excessReturn?.address ?? null,
-                        forwardPayload: notification?.payload ?? null,
-                        forwardTonAmount: notification?.amount ?? 0n,
-                        walletForwardValue:
-                            (notification?.amount ?? 0n) + (excessReturn ? toNano('0.01') : 0n) + toNano('0.02'),
-                    }),
-                )
-                .endCell(),
+            body: boc,
         });
+
+        return boc.toBoc().toString('hex');
     }
 
     async sendChangeAdmin(
