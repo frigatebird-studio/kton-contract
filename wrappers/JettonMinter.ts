@@ -67,15 +67,89 @@ export function prepareMint(
             }),
         )
         .endCell();
-    const returns: IPrepare = {
+    const preparedPayload: IPrepare = {
         sentToAddress: minterAddress,
         payload: boc,
     };
     if (mintExchangeRate) {
-        returns.value = (amount * mintExchangeRate) / TON_DECIMALS + expectedFee;
+        preparedPayload.value = (amount * mintExchangeRate) / TON_DECIMALS + expectedFee;
     }
 
-    return returns;
+    return preparedPayload;
+}
+
+export function prepareChangeOwner(minterAddress: Address, newAdmin: Address,
+    options?: {
+        value?: bigint;
+        queryId?: bigint;
+    }): IPrepare {
+    const payload = beginCell()
+        .store(
+            storeJettonChangeAdminMessage({
+                queryId: options?.queryId ?? 0n,
+                newAdmin: newAdmin,
+            }),
+        )
+        .endCell()
+    return { sentToAddress: minterAddress, payload, value: options?.value ?? toNano('0.05') };
+}
+
+export function prepareChangeContent(minterAddress: Address, newContent: Cell,
+    options?: {
+        value?: bigint;
+        queryId?: bigint;
+    }): IPrepare {
+    const payload = beginCell()
+        .store(
+            storeJettonChangeContentMessage({
+                queryId: options?.queryId ?? 0n,
+                newContent: newContent,
+            }),
+        )
+        .endCell()
+    return { sentToAddress: minterAddress, payload, value: options?.value ?? toNano('0.05') };
+}
+
+export function prepareChangeExchangeRates(minterAddress: Address, newMintExchangeRate: bigint, newBurnExchangeRate: bigint,
+    options?: {
+        value?: bigint;
+        queryId?: bigint;
+    }): IPrepare {
+    const payload = beginCell()
+        .storeUint(5, 32)
+        .storeUint(options?.queryId ?? 0, 64)
+        .storeUint(newMintExchangeRate, 64)
+        .storeUint(newBurnExchangeRate, 64)
+        .endCell()
+
+    return { sentToAddress: minterAddress, payload, value: options?.value ?? toNano('0.05') };
+}
+
+export function prepareChangeEnables(minterAddress: Address, isMintable: boolean, isBurnable: boolean,
+    options?: {
+        value?: bigint;
+        queryId?: bigint;
+    }): IPrepare {
+    const payload = beginCell()
+        .storeUint(6, 32)
+        .storeUint(options?.queryId ?? 0, 64)
+        .storeBit(isMintable)
+        .storeBit(isBurnable)
+        .endCell()
+
+    return { sentToAddress: minterAddress, payload, value: options?.value ?? toNano('0.05') };
+}
+
+export function prepareWithdrawAll(minterAddress: Address, options?: {
+    value?: bigint;
+    queryId?: bigint;
+}): IPrepare {
+    const payload = beginCell()
+        .storeUint(7, 32)
+        .storeUint(options?.queryId ?? 0, 64)
+        .endCell()
+
+    return { sentToAddress: minterAddress, payload, value: options?.value ?? toNano('0.05') };
 }
 
 export class JettonMinter implements Contract {
@@ -83,7 +157,7 @@ export class JettonMinter implements Contract {
         public readonly address: Address,
         public readonly init?: StateInit,
         public readonly contentResolver?: ContentResolver,
-    ) {}
+    ) { }
 
     static createFromAddress(address: Address, contentResolver?: ContentResolver): JettonMinter {
         return new JettonMinter(address, undefined, contentResolver);
@@ -135,17 +209,12 @@ export class JettonMinter implements Contract {
             queryId?: bigint;
         },
     ) {
+        const preparation = prepareChangeOwner(this.address, newAdmin, options);
+
         await provider.internal(sender, {
-            value: options?.value ?? toNano('0.05'),
+            value: preparation.value!,
             bounce: true,
-            body: beginCell()
-                .store(
-                    storeJettonChangeAdminMessage({
-                        queryId: options?.queryId ?? 0n,
-                        newAdmin: newAdmin,
-                    }),
-                )
-                .endCell(),
+            body: preparation.payload,
         });
     }
 
@@ -158,17 +227,12 @@ export class JettonMinter implements Contract {
             queryId?: bigint;
         },
     ) {
+        const preparation = prepareChangeContent(this.address, newContent, options);
+
         await provider.internal(sender, {
-            value: options?.value ?? toNano('0.05'),
+            value: preparation.value!,
             bounce: true,
-            body: beginCell()
-                .store(
-                    storeJettonChangeContentMessage({
-                        queryId: options?.queryId ?? 0n,
-                        newContent: newContent,
-                    }),
-                )
-                .endCell(),
+            body: preparation.payload
         });
     }
 
@@ -182,15 +246,12 @@ export class JettonMinter implements Contract {
             queryId?: bigint;
         },
     ) {
+        const preparation = prepareChangeExchangeRates(this.address, newMintExchangeRate, newBurnExchangeRate, options);
+
         await provider.internal(sender, {
-            value: options?.value ?? toNano('0.05'),
+            value: preparation.value!,
             bounce: true,
-            body: beginCell()
-                .storeUint(5, 32)
-                .storeUint(options?.queryId ?? 0, 64)
-                .storeUint(newMintExchangeRate, 64)
-                .storeUint(newBurnExchangeRate, 64)
-                .endCell(),
+            body: preparation.payload,
         });
     }
 
@@ -204,15 +265,12 @@ export class JettonMinter implements Contract {
             queryId?: bigint;
         },
     ) {
+        const preparation = prepareChangeEnables(this.address, isMintable, isBurnable, options);
+
         await provider.internal(sender, {
-            value: options?.value ?? toNano('0.05'),
+            value: preparation.value!,
             bounce: true,
-            body: beginCell()
-                .storeUint(6, 32)
-                .storeUint(options?.queryId ?? 0, 64)
-                .storeBit(isMintable)
-                .storeBit(isBurnable)
-                .endCell(),
+            body: preparation.payload,
         });
     }
 
@@ -224,13 +282,11 @@ export class JettonMinter implements Contract {
             queryId?: bigint;
         },
     ) {
+        const preparation = prepareWithdrawAll(this.address, options);
         await provider.internal(sender, {
-            value: options?.value ?? toNano('0.05'),
+            value: preparation.value!,
             bounce: true,
-            body: beginCell()
-                .storeUint(7, 32)
-                .storeUint(options?.queryId ?? 0, 64)
-                .endCell(),
+            body: preparation.payload,
         });
     }
 
@@ -312,10 +368,10 @@ export class JettonMinter implements Contract {
         options?:
             | { lt?: never; hash?: never; limit?: number }
             | {
-                  lt: bigint;
-                  hash: Buffer;
-                  limit?: number;
-              },
+                lt: bigint;
+                hash: Buffer;
+                limit?: number;
+            },
     ): Promise<JettonMinterAction[]> {
         let { lt, hash, limit } = options ?? {};
         if (!lt || !hash) {
