@@ -29,7 +29,7 @@ export function jettonMinterConfigToCell(config: JettonMinterConfig): Cell {
 }
 
 export interface IPrepare {
-    sentToAddress: Address;
+    sendToAddress: Address;
     payload: Cell;
     value?: bigint;
     stateInit?: StateInit;
@@ -68,7 +68,7 @@ export function prepareMint(
         )
         .endCell();
     const preparedPayload: IPrepare = {
-        sentToAddress: minterAddress,
+        sendToAddress: minterAddress,
         payload: boc,
     };
     if (mintExchangeRate) {
@@ -91,7 +91,7 @@ export function prepareChangeOwner(minterAddress: Address, newAdmin: Address,
             }),
         )
         .endCell()
-    return { sentToAddress: minterAddress, payload, value: options?.value ?? toNano('0.05') };
+    return { sendToAddress: minterAddress, payload, value: options?.value ?? toNano('0.05') };
 }
 
 export function prepareChangeContent(minterAddress: Address, newContent: Cell,
@@ -107,7 +107,7 @@ export function prepareChangeContent(minterAddress: Address, newContent: Cell,
             }),
         )
         .endCell()
-    return { sentToAddress: minterAddress, payload, value: options?.value ?? toNano('0.05') };
+    return { sendToAddress: minterAddress, payload, value: options?.value ?? toNano('0.05') };
 }
 
 export function prepareChangeExchangeRates(minterAddress: Address, newMintExchangeRate: bigint, newBurnExchangeRate: bigint,
@@ -122,7 +122,7 @@ export function prepareChangeExchangeRates(minterAddress: Address, newMintExchan
         .storeUint(newBurnExchangeRate, 64)
         .endCell()
 
-    return { sentToAddress: minterAddress, payload, value: options?.value ?? toNano('0.05') };
+    return { sendToAddress: minterAddress, payload, value: options?.value ?? toNano('0.05') };
 }
 
 export function prepareChangeEnables(minterAddress: Address, isMintable: boolean, isBurnable: boolean,
@@ -137,7 +137,7 @@ export function prepareChangeEnables(minterAddress: Address, isMintable: boolean
         .storeBit(isBurnable)
         .endCell()
 
-    return { sentToAddress: minterAddress, payload, value: options?.value ?? toNano('0.05') };
+    return { sendToAddress: minterAddress, payload, value: options?.value ?? toNano('0.05') };
 }
 
 export function prepareWithdrawAll(minterAddress: Address, options?: {
@@ -149,7 +149,7 @@ export function prepareWithdrawAll(minterAddress: Address, options?: {
         .storeUint(options?.queryId ?? 0, 64)
         .endCell()
 
-    return { sentToAddress: minterAddress, payload, value: options?.value ?? toNano('0.05') };
+    return { sendToAddress: minterAddress, payload, value: options?.value ?? toNano('0.05') };
 }
 
 export class JettonMinter implements Contract {

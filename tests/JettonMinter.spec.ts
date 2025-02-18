@@ -140,7 +140,7 @@ describe('JettonMinter', () => {
 
         const mintResult = await recipient.sendMessages([
             internal({
-                to: preparation.sentToAddress,
+                to: preparation.sendToAddress,
                 value: preparation.value!,
                 body: preparation.payload,
             }),
