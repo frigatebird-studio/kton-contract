@@ -469,4 +469,28 @@ describe('JettonMinter', () => {
         expect(deployerNewBalance).toBeGreaterThan(deployerOldBalance);
         expect(contractNewBalance).toBe(0n);
     });
+
+    it('should not drain our funds', async () => {
+        const attacker = await blockchain.treasury('attacker', { balance: toNano('1000') });
+        const attackerBalanceBefore = await attacker.getBalance();
+        const fundBalanceBefore = await jettonMinter.getBalance();
+
+        for (let i = 0; i < 500; i++) {
+            await attacker.sendMessages([
+                internal({
+                    to: jettonMinter.address,
+                    value: 1n, //toNano('1'),
+                    body: beginCell().storeUint(87878, 32).storeUint(87878, 64).endCell(),
+                }),
+            ])
+        }
+
+        const fundBalanceAfter = await jettonMinter.getBalance();
+        const attackerBalanceAfter = await attacker.getBalance();
+
+        const attackerBalanceDiff = attackerBalanceBefore - attackerBalanceAfter;
+        const fundBalanceDiff = fundBalanceBefore - fundBalanceAfter;
+
+        expect(attackerBalanceDiff).toBeGreaterThan(fundBalanceDiff);
+    })
 });
