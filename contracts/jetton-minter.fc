@@ -170,21 +170,21 @@ global int ctx_burnable;
         return ();
     }
 
-    if (op == 3) { ;; change admin
+    if (op == op::change_admin()) { ;; change admin
         throw_unless(73, equal_slices_bits(sender_address, ctx_admin_address));
         ctx_admin_address = in_msg_body~load_msg_addr();
         save_data();
         return ();
     }
 
-    if (op == 4) { ;; change content, delete this for immutable tokens
+    if (op == op::change_content()) { ;; change content, delete this for immutable tokens
         throw_unless(73, equal_slices_bits(sender_address, ctx_admin_address));
         ctx_content = in_msg_body~load_ref();
         save_data();
         return ();
     }
 
-    if (op == 5) { ;; update exchange rates
+    if (op == op::update_exchange_rates()) { ;; update exchange rates
         throw_unless(73, equal_slices_bits(sender_address, ctx_admin_address));
         ctx_mint_exchange_rate = in_msg_body~load_uint(64);
         ctx_burn_exchange_rate = in_msg_body~load_uint(64);
@@ -192,7 +192,7 @@ global int ctx_burnable;
         return ();
     }
 
-    if (op == 6) { ;; update mintable and burnable
+    if (op == op::update_enables()) { ;; update mintable and burnable
         throw_unless(73, equal_slices_bits(sender_address, ctx_admin_address));
         ctx_mintable = in_msg_body~load_uint(1);
         ctx_burnable = in_msg_body~load_uint(1);
@@ -200,7 +200,7 @@ global int ctx_burnable;
         return ();
     }
 
-    if (op == 7) { ;; withdraw
+    if (op == op::withdraw()) { ;; withdraw
         throw_unless(73, equal_slices_bits(sender_address, ctx_admin_address));
         var msg = begin_cell()
             .store_uint(0x18, 6)
