@@ -14,7 +14,7 @@ import {
 import { JettonWallet } from '../wrappers/JettonWallet';
 
 // explicitly set fees
-const mintFee = toNano('0.05');
+const mintFee = toNano('0.08');
 const burnFee = toNano('0.025');
 const adminOperationFee = toNano('0.01');
 
@@ -181,7 +181,7 @@ describe('JettonMinter', () => {
             from: recipient.address,
             to: jettonMinter.address,
             success: false,
-            actionResultCode: 37,
+            exitCode: 77,
         });
 
         const data = await jettonMinter.getData();

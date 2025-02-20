@@ -60,7 +60,7 @@ global int ctx_burnable;
             .store_uint(4 + 2 + 1, 1 + 4 + 4 + 64 + 32 + 1 + 1 + 1)
             .store_ref(state_init)
             .store_ref(master_msg);
-    send_raw_message(msg.end_cell(), 0); ;; revert on errors
+    send_raw_message(msg.end_cell(), 0); ;; revert on errors and send remaining values
 }
 
 () recv_internal(int balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
@@ -80,7 +80,7 @@ global int ctx_burnable;
     cs~load_coins(); ;; skip value
     cs~skip_bits(1); ;; skip extracurrency collection
     cs~load_coins(); ;; skip ihr_fee
-    int fwd_fee = cs~load_coins(); ;; we use message fwd_fee for estimation of provide_wallet_address cost
+    int fwd_fee = muldiv(cs~load_coins(), 3, 2); ;; we use message fwd_fee for transfer fee estimation
 
     int op = in_msg_body~load_uint(32);
     int query_id = in_msg_body~load_uint(64);
@@ -98,11 +98,17 @@ global int ctx_burnable;
         int jetton_amount = master_msg_cs~load_coins();
 
         int received_ton_expected = muldiv(jetton_amount, ctx_mint_exchange_rate, TON_DECIMALS);
-        throw_unless(77, msg_value > fwd_fee + received_ton_expected);
 
-        raw_reserve(balance - msg_value + received_ton_expected, RESERVE_REGULAR);
+        ;; confirm that message covers storage fee, gas fee and fwd_fee
+        int reserved_ton = balance - msg_value + received_ton_expected;
+        int ton_could_be_sent = balance - reserved_ton;
+        int ton_should_be_sent = 2 * fwd_fee + const::gas_consumption() + const::min_tons_for_storage() + amount;
 
-        mint_tokens(to_address, amount, master_msg);
+        throw_unless(77, (ton_could_be_sent >= ton_should_be_sent) & (ton_should_be_sent >= amount));
+
+        raw_reserve(reserved_ton, RESERVE_REGULAR);
+
+        mint_tokens(to_address, ton_should_be_sent, master_msg);
         ctx_total_supply = ctx_total_supply + jetton_amount;
         save_data();
         return ();
