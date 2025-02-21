@@ -8,3 +8,8 @@ int op::burn_redeem() asm "0x6d88d6dd PUSHINT";
 
 ;; Minter
 int op::mint() asm "21 PUSHINT";
+int op::change_admin() asm "3 PUSHINT";
+int op::change_content() asm "4 PUSHINT";
+int op::update_exchange_rates() asm "5 PUSHINT";
+int op::update_enables() asm "6 PUSHINT";
+int op::withdraw() asm "7 PUSHINT";

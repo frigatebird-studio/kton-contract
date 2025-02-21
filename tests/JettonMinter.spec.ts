@@ -13,6 +13,11 @@ import {
 } from '../wrappers/opcodes';
 import { JettonWallet } from '../wrappers/JettonWallet';
 
+// explicitly set fees
+const mintFee = toNano('0.08');
+const burnFee = toNano('0.025');
+const adminOperationFee = toNano('0.01');
+
 describe('JettonMinter', () => {
     let code: Cell;
     let walletCode: Cell;
@@ -72,7 +77,7 @@ describe('JettonMinter', () => {
         const payAmount = (mintAmount * defaultConfig.mintExchangeRate) / 1000000000n;
 
         const mintResult = await jettonMinter.sendMint(deployer.getSender(), recipient.address, mintAmount, {
-            value: payAmount + toNano('1'),
+            value: payAmount + mintFee,
             returnExcess: true,
         });
 
@@ -121,7 +126,7 @@ describe('JettonMinter', () => {
     it('should mint tokens correctly by random wallet (via raw send)', async () => {
         const recipient = await blockchain.treasury('random');
         const mintAmount = toNano('100');
-        const fee = toNano('0.05');
+        const fee = mintFee;
         const payAmount = (mintAmount * defaultConfig.mintExchangeRate) / 1000000000n;
 
         const preparation = prepareMint(
@@ -176,14 +181,14 @@ describe('JettonMinter', () => {
             from: recipient.address,
             to: jettonMinter.address,
             success: false,
-            actionResultCode: 37,
+            exitCode: 77,
         });
 
         const data = await jettonMinter.getData();
         expect(data.totalSupply).toBe(0n);
     });
 
-    it('should mint tokens incorrectly (missing fwd_fee + compute_fee)', async () => {
+    it('should mint tokens incorrectly (missing fwd_fee and compute_fee)', async () => {
         const recipient = await blockchain.treasury('recipient');
         const mintAmount = toNano('100');
         const payAmount = (mintAmount * defaultConfig.mintExchangeRate) / 1000000000n;
@@ -205,12 +210,13 @@ describe('JettonMinter', () => {
     });
 
     it('should burn tokens correctly', async () => {
+        // mint first
         const recipient = await blockchain.treasury('recipient');
         let mintAmount = toNano('100');
         const payAmount = (mintAmount * defaultConfig.mintExchangeRate) / 1000000000n;
 
         const mintResult = await jettonMinter.sendMint(deployer.getSender(), recipient.address, mintAmount, {
-            value: payAmount + toNano('0.05'),
+            value: payAmount + mintFee,
             returnExcess: true,
         });
 
@@ -223,13 +229,15 @@ describe('JettonMinter', () => {
         const data1 = await jettonMinter.getData();
         expect(data1.totalSupply).toBe(mintAmount);
 
+        // start step burning
         for (let i = 0; i < 100; i++) {
+            // burn 1 at once (to check if we drain the wallet properly)
             const burnAmount = toNano('1');
             const jettonWallet = blockchain.openContract(
                 JettonWallet.createFromAddress(await jettonMinter.getWalletAddress(recipient.address)),
             );
             const burnResults = await jettonWallet.sendBurn(recipient.getSender(), burnAmount, {
-                value: toNano('0.025'),
+                value: burnFee,
                 returnExcess: true,
             });
 
@@ -262,6 +270,7 @@ describe('JettonMinter', () => {
     });
 
     it('should burn tokens incorrectly (value not enough)', async () => {
+        // mint first
         const recipient = await blockchain.treasury('recipient');
         let mintAmount = toNano('100');
         const payAmount = (mintAmount * defaultConfig.mintExchangeRate) / 1000000000n;
@@ -280,12 +289,13 @@ describe('JettonMinter', () => {
         let data = await jettonMinter.getData();
         expect(data.totalSupply).toBe(mintAmount);
 
+        // burn token
         const burnAmount = toNano('1');
         const jettonWallet = blockchain.openContract(
             JettonWallet.createFromAddress(await jettonMinter.getWalletAddress(recipient.address)),
         );
         const burnResults = await jettonWallet.sendBurn(recipient.getSender(), burnAmount, {
-            value: toNano('0.005'),
+            value: toNano('0.005'), // not enough burn fee
             returnExcess: true,
         });
 
@@ -304,7 +314,7 @@ describe('JettonMinter', () => {
         const newAdmin = await blockchain.treasury('newAdmin');
 
         const changeAdminResult = await jettonMinter.sendChangeAdmin(deployer.getSender(), newAdmin.address, {
-            value: toNano('0.05'),
+            value: adminOperationFee,
         });
 
         expect(changeAdminResult.transactions).toHaveTransaction({
@@ -323,7 +333,7 @@ describe('JettonMinter', () => {
             3333333333n,
             333333333n,
             {
-                value: toNano('0.05'),
+                value: adminOperationFee,
             },
         );
 
@@ -402,7 +412,7 @@ describe('JettonMinter', () => {
         const newContent = beginCell().storeUint(1, 8).storeStringTail('new content').endCell();
 
         const changeContentResult = await jettonMinter.sendChangeContent(deployer.getSender(), newContent, {
-            value: toNano('0.05'),
+            value: adminOperationFee,
         });
 
         expect(changeContentResult.transactions).toHaveTransaction({
@@ -447,7 +457,6 @@ describe('JettonMinter', () => {
 
     it('should withdraw all correctly', async () => {
         const deployerOldBalance = await deployer.getBalance();
-        const contractOldBalance = await jettonMinter.getBalance();
 
         const withdrawResult = await jettonMinter.sendWithdrawAll(deployer.getSender());
 
@@ -469,4 +478,28 @@ describe('JettonMinter', () => {
         expect(deployerNewBalance).toBeGreaterThan(deployerOldBalance);
         expect(contractNewBalance).toBe(0n);
     });
+
+    it('should not drain our funds', async () => {
+        const attacker = await blockchain.treasury('attacker', { balance: toNano('1000') });
+        const attackerBalanceBefore = await attacker.getBalance();
+        const fundBalanceBefore = await jettonMinter.getBalance();
+
+        for (let i = 0; i < 500; i++) {
+            await attacker.sendMessages([
+                internal({
+                    to: jettonMinter.address,
+                    value: 1n,
+                    body: beginCell().storeUint(87878, 32).storeUint(87878, 64).endCell(),
+                }),
+            ])
+        }
+
+        const fundBalanceAfter = await jettonMinter.getBalance();
+        const attackerBalanceAfter = await attacker.getBalance();
+
+        const attackerBalanceDiff = attackerBalanceBefore - attackerBalanceAfter;
+        const fundBalanceDiff = fundBalanceBefore - fundBalanceAfter;
+
+        expect(attackerBalanceDiff).toBeGreaterThan(fundBalanceDiff);
+    })
 });

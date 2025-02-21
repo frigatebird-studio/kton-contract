@@ -46,7 +46,7 @@ export function prepareMint(
         value?: bigint;
         queryId?: bigint;
     },
-    expectedFee: bigint = toNano('0.1'),
+    expectedFee: bigint = toNano('0.08'),
     mintExchangeRate?: bigint,
 ): IPrepare {
     const notification = parseNotifyOptions(options?.notify);
@@ -91,7 +91,7 @@ export function prepareChangeOwner(minterAddress: Address, newAdmin: Address,
             }),
         )
         .endCell()
-    return { sendToAddress: minterAddress, payload, value: options?.value ?? toNano('0.05') };
+    return { sendToAddress: minterAddress, payload, value: options?.value ?? toNano('0.01') };
 }
 
 export function prepareChangeContent(minterAddress: Address, newContent: Cell,
@@ -107,7 +107,7 @@ export function prepareChangeContent(minterAddress: Address, newContent: Cell,
             }),
         )
         .endCell()
-    return { sendToAddress: minterAddress, payload, value: options?.value ?? toNano('0.05') };
+    return { sendToAddress: minterAddress, payload, value: options?.value ?? toNano('0.01') };
 }
 
 export function prepareChangeExchangeRates(minterAddress: Address, newMintExchangeRate: bigint, newBurnExchangeRate: bigint,
@@ -122,7 +122,7 @@ export function prepareChangeExchangeRates(minterAddress: Address, newMintExchan
         .storeUint(newBurnExchangeRate, 64)
         .endCell()
 
-    return { sendToAddress: minterAddress, payload, value: options?.value ?? toNano('0.05') };
+    return { sendToAddress: minterAddress, payload, value: options?.value ?? toNano('0.01') };
 }
 
 export function prepareChangeEnables(minterAddress: Address, isMintable: boolean, isBurnable: boolean,
@@ -137,7 +137,7 @@ export function prepareChangeEnables(minterAddress: Address, isMintable: boolean
         .storeBit(isBurnable)
         .endCell()
 
-    return { sendToAddress: minterAddress, payload, value: options?.value ?? toNano('0.05') };
+    return { sendToAddress: minterAddress, payload, value: options?.value ?? toNano('0.01') };
 }
 
 export function prepareWithdrawAll(minterAddress: Address, options?: {
@@ -149,7 +149,7 @@ export function prepareWithdrawAll(minterAddress: Address, options?: {
         .storeUint(options?.queryId ?? 0, 64)
         .endCell()
 
-    return { sendToAddress: minterAddress, payload, value: options?.value ?? toNano('0.05') };
+    return { sendToAddress: minterAddress, payload, value: options?.value ?? toNano('0.01') };
 }
 
 export class JettonMinter implements Contract {
