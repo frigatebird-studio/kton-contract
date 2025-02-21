@@ -20,7 +20,7 @@ export async function run(provider: NetworkProvider) {
 
     const minter = provider.open(JettonMinter.createFromConfig(jettonConfig, await compile('JettonMinter')));
 
-    await minter.sendDeploy(provider.sender(), toNano('0.05'));
+    await minter.sendDeploy(provider.sender(), toNano('0.005'));
 
     await provider.waitForDeploy(minter.address);
 }

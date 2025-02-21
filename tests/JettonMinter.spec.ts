@@ -49,7 +49,7 @@ describe('JettonMinter', () => {
 
         jettonMinter = blockchain.openContract(JettonMinter.createFromConfig(defaultConfig, code));
 
-        const deployResult = await jettonMinter.sendDeploy(deployer.getSender(), toNano('0.05'));
+        const deployResult = await jettonMinter.sendDeploy(deployer.getSender(), toNano('0.005'));
         expect(deployResult.transactions).toHaveTransaction({
             from: deployer.address,
             to: jettonMinter.address,
