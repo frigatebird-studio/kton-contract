@@ -15,7 +15,7 @@ import { JettonWallet } from '../wrappers/JettonWallet';
 
 // explicitly set fees
 const mintFee = toNano('0.08');
-const burnFee = toNano('0.025');
+const burnFee = toNano('0.05');
 const adminOperationFee = toNano('0.01');
 
 describe('JettonMinter', () => {
@@ -379,7 +379,7 @@ describe('JettonMinter', () => {
             JettonWallet.createFromAddress(await jettonMinter.getWalletAddress(recipient.address)),
         );
         const burnResults = await jettonWallet.sendBurn(recipient.getSender(), burnAmount, {
-            value: toNano('0.025'),
+            value: burnFee,
             returnExcess: true,
         });
 
@@ -491,7 +491,7 @@ describe('JettonMinter', () => {
                     value: 1n,
                     body: beginCell().storeUint(87878, 32).storeUint(87878, 64).endCell(),
                 }),
-            ])
+            ]);
         }
 
         const fundBalanceAfter = await jettonMinter.getBalance();
@@ -501,5 +501,5 @@ describe('JettonMinter', () => {
         const fundBalanceDiff = fundBalanceBefore - fundBalanceAfter;
 
         expect(attackerBalanceDiff).toBeGreaterThan(fundBalanceDiff);
-    })
+    });
 });
